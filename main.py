@@ -59,28 +59,45 @@ def validate(text):
     return None
 
 
+def output_path():
+    """Entry destination: $MAKEFUN_OUTPUT_DIR/entry.txt, else /output."""
+    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR")
+    if out_dir:
+        return os.path.join(out_dir, "entry.txt")
+    return OUTPUT_PATH
+
+
+def verify_written_bytes(written, intended):
+    """Byte-exact read-back verification: same length, same bytes,
+    same sha256 digest."""
+    if len(written) != len(intended):
+        raise SystemExit("read-back byte length mismatch")
+    if written != intended:
+        raise SystemExit("read-back mismatch: written bytes differ")
+    if hashlib.sha256(written).digest() != hashlib.sha256(intended).digest():
+        raise SystemExit("read-back digest mismatch")
+
+
 def main():
     problem = validate(CONFESSION)
     if problem is not None:
         raise SystemExit(problem)
 
-    out_dir = os.path.dirname(OUTPUT_PATH)
+    path = output_path()
+    out_dir = os.path.dirname(path)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
 
     # newline="" keeps the file free of any platform line-ending
     # translation; the confession is written with no trailing newline.
-    with open(OUTPUT_PATH, "w", encoding="utf-8", newline="") as handle:
+    with open(path, "w", encoding="utf-8", newline="") as handle:
         handle.write(CONFESSION)
 
-    # Read-back verification: the bytes on disk must hash to exactly
-    # the confession's sha256 digest; fail loudly on any drift.
-    with open(OUTPUT_PATH, "rb") as handle:
+    # Read-back verification: the bytes on disk must be exactly the
+    # confession's bytes; fail loudly on any drift.
+    with open(path, "rb") as handle:
         written = handle.read()
-    if hashlib.sha256(written).digest() != hashlib.sha256(
-        CONFESSION.encode("utf-8")
-    ).digest():
-        raise SystemExit("read-back mismatch: written bytes differ")
+    verify_written_bytes(written, CONFESSION.encode("utf-8"))
     return 0
 
 
